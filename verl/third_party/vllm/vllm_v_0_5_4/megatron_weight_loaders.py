@@ -76,6 +76,9 @@ def llama_megatron_weight_loader(actor_weights: Dict, vllm_model: nn.Module) -> 
     for name, loaded_weight in actor_weights.items():
         if "rotary_emb.inv_freq" in name:
             continue
+        elif "lm_head" in name and vllm_model.config.tie_word_embeddings:
+            # skip if model lm-head tied with embedding, for example, llama-3.2-1B
+            continue
         else:
             param = params_dict[name]
             weight_loader = getattr(param, "weight_loader", default_weight_loader)
