@@ -15,8 +15,6 @@
 A unified tracking interface that supports logging data to different backend
 """
 
-import wandb
-
 from typing import List, Union
 
 
@@ -32,6 +30,8 @@ class Tracking(object):
         self.logger = {}
 
         if 'tracking' in default_backend:
+            # may be lazy import?
+            import wandb
             wandb.init(project=project_name, name=experiment_name, config=config)
             self.logger['tracking'] = wandb
 
