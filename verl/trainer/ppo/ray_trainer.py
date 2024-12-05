@@ -423,15 +423,34 @@ class RayPPOTrainer(object):
                 metrics = {}
 
                 batch: DataProto = DataProto.from_single_dict(batch_dict)
+                print(f'>>> Keys in data.batch is: {batch.batch.keys()}')
+                print(f'>>> Metainfo in data.batch is: {batch.meta_info}')
                 # batch = batch.to('cuda')
 
                 # pop those keys for generation
                 gen_batch = batch.pop(batch_keys=['input_ids', 'attention_mask', 'position_ids'])
+                print(f'>> Shape of gen_batch.inputs_ids: {gen_batch.batch["input_ids"].shape}')
+                print(f'>>> First line in gen_batch.inputs_ids: {gen_batch.batch["input_ids"][0]}')
+                print(f'>> Shape of gen_batch.attention_mask: {gen_batch.batch["attention_mask"].shape}')
+                print(f'>>> First line in gen_batch.attention_mask.ids: {gen_batch.batch["attention_mask"][0]}')
+                print(f'>> Shape of gen_batch.position_ids: {gen_batch.batch["position_ids"].shape}')
+                print(f'>>> First line in gen_batch.position_ids: {gen_batch.batch["position_ids"][0]}')
 
                 # generate a batch
                 with Timer(name='gen', logger=None) as timer:
                     gen_batch_output = self.actor_rollout_wg.generate_sequences(gen_batch)
                 metrics['timing/gen'] = timer.last
+
+                print(f'>> Keys in gen_batch_output.batch: {gen_batch_output.batch.keys()}')
+                print(f'>>> Shape of gen_batch_output.responses: {gen_batch_output.batch["input_ids"].shape}') # should be (batch_size, prompt+response_length)
+                print(f'>>> Shape of gen_batch_output.prompt: {gen_batch_output.batch["prompt"].shape}')
+                print(f'>>> First line of gen_batch_output.prompt: {gen_batch_output.batch["prompt"][0]}')
+                print(f'>>> Shape of gen_batch_output.responses: {gen_batch_output.batch["responses"].shape}')
+                print(f'>>> First line of gen_batch_output.responses: {gen_batch_output.batch["responses"][0]}')
+                print(f'>>> Shape of gen_batch_output.old_log_probs: {gen_batch_output.batch["old_log_probs"].shape}')
+                # print(f'>>> First line of gen_batch_output.old_log_probs: {}')
+
+                print(f'>> Metainfo in gen_batch_output: {gen_batch_output.meta_info}')
 
                 batch = batch.union(gen_batch_output)
 
@@ -439,6 +458,10 @@ class RayPPOTrainer(object):
                     # compute reference log_prob
                     with Timer(name='ref', logger=None) as timer:
                         ref_log_prob = self.ref_policy_wg.compute_ref_log_prob(batch)
+                        print(f'>> Keys in ref_log_prob.batch: {ref_log_prob.batch.keys()}')
+                        print(f'>> Metainfo in ref_log_prob: {ref_log_prob.meta_info}')
+                        print(f'>> Shape of ref_log_prob: {ref_log_prob.batch["ref_log_prob"].shape}')
+                        print(f'>> First line of ref_log_prob: {ref_log_prob.batch["ref_log_prob"][0]}')
                         batch = batch.union(ref_log_prob)
                     metrics['timing/ref'] = timer.last
 
@@ -446,6 +469,10 @@ class RayPPOTrainer(object):
                 with Timer(name='values', logger=None) as timer:
                     values = self.critic_wg.compute_values(batch)
                     batch = batch.union(values)
+                    print(f'>> Keys in values.batch: {values.batch.keys()}')
+                    print(f'>> Metainfo in values: {values.meta_info}')
+                    print(f'>> Shape of values: {values.batch["values"].shape}')
+                    print(f'>> First line of values: {values.batch["values"][0]}')
                 metrics['timing/values'] = timer.last
 
                 with Timer(name='adv', logger=None) as timer:
@@ -459,6 +486,8 @@ class RayPPOTrainer(object):
 
                     # we combine with rule-based rm
                     reward_tensor = self.reward_fn(batch)
+                    print(f'>> Shape of reward tensor (token level scores): {reward_tensor.shape}')
+                    print(f'>> First line of reward_tensor: {reward_tensor[0]}')
                     batch.batch['token_level_scores'] = reward_tensor
 
                     # compute rewards. apply_kl_penalty if available
@@ -472,12 +501,17 @@ class RayPPOTrainer(object):
                                               self.config.algorithm.gamma,
                                               self.config.algorithm.lam,
                                               adv_estimator=self.config.algorithm.adv_estimator)
+                    print(f'>> Keys after compute_advantage: {batch.batch.keys()}')
+                    print(f'>> Metainfo after compute_advantage: {batch.meta_info}')
+                    print(f'>> Shape of compted_advantage tensor (token level scores): {batch.batch["advantages"].shape}')
+                    print(f'>> First line of computed_advantage tensor: {batch.batch["advantages"][0]}')
                 metrics['timing/adv'] = timer.last
 
                 # update critic
                 if self.use_critic:
                     with Timer(name='update_critic', logger=None) as timer:
                         critic_output = self.critic_wg.update_critic(batch)
+                        print(f'>> Metainfo in critic_output: {critic_output.meta_info}')
                     metrics['timing/update_critic'] = timer.last
                     critic_output_metrics = reduce_metrics(critic_output.meta_info['metrics'])
                     metrics.update(critic_output_metrics)
@@ -486,7 +520,10 @@ class RayPPOTrainer(object):
                 if self.config.trainer.critic_warmup <= global_steps:
                     # update actor
                     with Timer(name='update_actor', logger=None) as timer:
+                        print(f'Final batch.keys: {batch.batch.keys()}')
+                        print(f'Final batch.metadata: {batch.meta_info}')
                         actor_output = self.actor_rollout_wg.update_actor(batch)
+                        print(f'>> Metainfo in actor_output: {actor_output.meta_info}')
                     metrics['timing/update_actor'] = timer.last
                     actor_output_metrics = reduce_metrics(actor_output.meta_info['metrics'])
                     metrics.update(actor_output_metrics)

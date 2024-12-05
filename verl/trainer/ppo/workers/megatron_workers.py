@@ -252,6 +252,18 @@ class ActorRolloutRefWorker(MegatronWorker):
                                                            model_config=self.actor_model_config,
                                                            layer_name_mapping=layer_name_mapping)
             log_gpu_memory_usage('After building sharding manager', logger=logger)
+        elif self.config.rollout.name == 'naive':
+            from verl.trainer.ppo.rollout.megatron.naive_rollout import MegatronNaiveRollout
+            from verl.trainer.ppo.hybrid_engine import MegatronNaiveShardingManager
+
+            rollout = MegatronNaiveRollout(
+                mdoel=self.actor_module, 
+                config=self.config,
+                tokenizer=self.tokenizer
+            )
+            sharding_manager = MegatronNaiveShardingManager()
+
+            return rollout, sharding_manager
         else:
             NotImplementedError('Only vllmRollout is supported with Megatron now')
 

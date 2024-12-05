@@ -16,6 +16,8 @@ from verl.utils.import_utils import is_vllm_available, is_megatron_core_availabl
 
 AllGatherPPModel = None
 
+from .megatron_naive import MegatronNaiveShardingManager
+
 if is_megatron_core_available() and is_vllm_available():
     from .megatron_vllm import AllGatherPPModel, MegatronVLLMShardingManager
 elif AllGatherPPModel is not None:
