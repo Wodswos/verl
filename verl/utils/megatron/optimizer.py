@@ -15,10 +15,10 @@
 
 from apex.optimizers import FusedAdam as Adam
 from apex.optimizers import FusedSGD as SGD
-from megatron.optimizer.distrib_optimizer import DistributedOptimizer
-from megatron.optimizer.grad_scaler import ConstantGradScaler, DynamicGradScaler
-from megatron.optimizer import Float16OptimizerWithFloat16Params, FP32Optimizer
-from megatron.optimizer import get_param_groups
+from megatron.core.optimizer.distrib_optimizer import DistributedOptimizer
+from megatron.core.optimizer.grad_scaler import ConstantGradScaler, DynamicGradScaler
+from megatron.core.optimizer import Float16OptimizerWithFloat16Params, FP32Optimizer
+from megatron.core.optimizer import _get_param_groups as get_param_groups
 
 from verl.utils.megatron.optimizer_config import OptimizerConfig
 
@@ -33,7 +33,7 @@ def get_megatron_optimizer(
         overlap_param_gather=False  # add for verl
 ):
     # Base optimizer.
-    param_groups = get_param_groups(model, no_weight_decay_cond, scale_lr_cond, lr_mult)
+    param_groups = get_param_groups(model, no_weight_decay_cond, scale_lr_cond, lr_mult, False)
 
     if config.optimizer == 'adam':
         optimizer = Adam(param_groups,
@@ -78,10 +78,35 @@ def get_megatron_optimizer(
                                                 hysteresis=config.hysteresis)
 
         # Megatron optimizer.
+        import torch
+        from megatron.core import mpu
+
+        def init_state_fn(opt):
+            for group in opt.param_groups:
+                for p in group['params']:
+                    if len(opt.state[p]) == 0:
+                        opt.state[p]['exp_avg'] = torch.zeros_like(p.data)
+                        opt.state[p]['exp_avg_sq'] = torch.zeros_like(p.data)
+
+        per_model_buffers = {}
+        for model_idx, model_chunk in enumerate(model):
+            if hasattr(model_chunk, 'buffers'):
+                per_model_buffers[model_idx] = model_chunk.buffers
+
         if config.use_distributed_optimizer:
-            return DistributedOptimizer(optimizer, config.clip_grad, config.log_num_zeros_in_grad,
-                                        check_for_nan_in_loss_and_grad, params_have_main_grad, config.fp16, config.bf16,
-                                        config.params_dtype, grad_scaler, model, overlap_param_gather)
+            # return DistributedOptimizer(optimizer, config.clip_grad, config.log_num_zeros_in_grad,
+            #                             check_for_nan_in_loss_and_grad, params_have_main_grad, config.fp16, config.bf16,
+            #                             config.params_dtype, grad_scaler, model, overlap_param_gather)
+            return DistributedOptimizer(
+                optimizer=optimizer,
+                config=config,
+                grad_scaler=grad_scaler,
+                init_state_fn=init_state_fn,
+                per_model_buffers=per_model_buffers,
+                data_parallel_group=mpu.get_data_parallel_group(with_context_parallel=True),
+                data_parallel_group_gloo=mpu.get_data_parallel_group_gloo(with_context_parallel=True),
+                data_parallel_group_idx=torch.distributed.get_rank(mpu.get_model_parallel_group())
+            )
         else:
             return Float16OptimizerWithFloat16Params(optimizer, config.clip_grad, config.log_num_zeros_in_grad,
                                                      check_for_nan_in_loss_and_grad, params_have_main_grad, config.fp16,
