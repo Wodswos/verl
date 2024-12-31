@@ -74,7 +74,7 @@ def llama_megatron_weight_loader(actor_weights: Dict, vllm_model: nn.Module) -> 
     # NOTE(shengguangming): the megatron llama may have this prefix
     params_dict = dict(vllm_model.named_parameters())
     for name, loaded_weight in actor_weights.items():
-        if "rotary_emb.inv_freq" in name:
+        if "rotary_emb.inv_freq" in name or 'lm_head.weight' in name:
             continue
         else:
             param = params_dict[name]
