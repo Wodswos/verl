@@ -14,7 +14,7 @@
 
 import megatron
 from megatron.core import mpu
-from megatron.utils import print_rank_0, unwrap_model
+from megatron.training.utils import print_rank_0, unwrap_model
 from megatron.model import Float16Module
 from megatron.model import DistributedDataParallel as LocalDDP
 from torch.nn.parallel import DistributedDataParallel as torchDDP
