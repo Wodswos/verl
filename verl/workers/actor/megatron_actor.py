@@ -319,7 +319,7 @@ class MegatronPPOActor(BasePPOActor):
                 model=self.actor_module,
                 num_microbatches=n_micro_batch,
                 seq_length=batch_size * seq_len,  # in use for pp = 1
-                # hidden_size=self.model_config.hidden_size,  # in use for pp = 1
+                hidden_size=self.model_config.hidden_size,  # in use for pp = 1
                 micro_batch_size=1,  # in use for pp = 1
                 forward_only=forward_only,
             )

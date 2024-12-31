@@ -83,10 +83,19 @@ class AllGatherPPModel:
         """Build the parameter buffer in each pp rank"""
         model = self.pp_models[pp_rank]
         weight_buffer_meta = get_weight_buffer_meta_from_module(model)
-        self.memory_buffers[pp_rank] = build_memory_buffer(weight_buffer_meta)
+        if pp_rank == self._pp_rank:
+            from verl.utils.memory_buffer import MemoryBuffer
+            source = self._this_rank_models[0].buffers[0].param_data
+            self.memory_buffers[pp_rank] = {
+                torch.bfloat16: MemoryBuffer(source.numel(), source.numel(), torch.bfloat16, source)
+            }
+        else:
+            self.memory_buffers[pp_rank] = build_memory_buffer(weight_buffer_meta)
 
     def _build_param_references(self, pp_rank, maintain_weight=False):
         model = self.pp_models[pp_rank]
+        if pp_rank == self._pp_rank:
+            return
         build_memory_reference_from_module(model, self.memory_buffers[pp_rank], maintain_weight=maintain_weight)
 
     def _load_params_to_cuda(self, pp_rank, to_empty=False):
@@ -121,8 +130,11 @@ class AllGatherPPModel:
             global_src = dist.get_global_rank(group=self.pp_group, group_rank=cur_pp_rank)
 
             # NOTE(sgm): the async op may cause memory leakage of the memory_buffer/pp_models
-            for memory_buffer in self.memory_buffers[cur_pp_rank].values():
-                dist.broadcast(tensor=memory_buffer.data, src=global_src, group=self.pp_group, async_op=False)
+            # for memory_buffer in self.memory_buffers[cur_pp_rank].values():
+            #     dist.broadcast(tensor=memory_buffer.data, src=global_src, group=self.pp_group, async_op=False)
+            # a slower way
+            for _, param in sorted(self.pp_models[cur_pp_rank].named_parameters()):
+                dist.broadcast(tensor=param.data, src=global_src, group=self.pp_group, async_op=False)
 
     def forward(self, *inputs, **kwargs):
         try:
