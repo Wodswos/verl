@@ -530,6 +530,12 @@ class RayPPOTrainer(object):
                         self.critic_wg.save_checkpoint(critic_local_path, critic_remote_path)
 
                 global_steps += 1
+                from torch.utils.tensorboard import SummaryWriter
+                writer = SummaryWriter('/root/autodl-tmp/verl-old/log')
+                writer.add_scalar('critic/rewards/mean', metrics['critic/rewards/mean'], global_steps)
+                writer.add_scalar('critic/vf_loss', metrics['critic/vf_loss'], global_steps)
+                writer.add_scalar('actor/entropy_loss', metrics['actor/entropy_loss'], global_steps)
+                writer.add_scalar('actor/pg_loss', metrics['actor/pg_loss'], global_steps)
 
         # perform validation after training
         if self.val_reward_fn is not None:
