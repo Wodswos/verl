@@ -252,7 +252,7 @@ class RayPPOTrainer(object):
                                          truncation='error')
         self.train_dataloader = DataLoader(dataset=self.train_dataset,
                                            batch_size=self.config.data.train_batch_size,
-                                           shuffle=True,
+                                           shuffle=False,
                                            drop_last=True,
                                            collate_fn=collate_fn)
 
@@ -265,7 +265,7 @@ class RayPPOTrainer(object):
                                        truncation='error')
         self.val_dataloader = DataLoader(dataset=self.val_dataset,
                                          batch_size=self.config.data.val_batch_size,
-                                         shuffle=True,
+                                         shuffle=False,
                                          drop_last=True,
                                          collate_fn=collate_fn)
 
@@ -530,7 +530,13 @@ class RayPPOTrainer(object):
                         self.critic_wg.save_checkpoint(critic_local_path, critic_remote_path)
 
                 global_steps += 1
-
+                
+                from torch.utils.tensorboard import SummaryWriter
+                writer = SummaryWriter('/root/autodl-tmp/log')
+                writer.add_scalar('critic/rewards/mean', metrics['critic/rewards/mean'], global_steps)
+                writer.add_scalar('critic/vf_loss', metrics['critic/vf_loss'], global_steps)
+                writer.add_scalar('actor/entropy_loss', metrics['actor/entropy_loss'], global_steps)
+                writer.add_scalar('actor/pg_loss', metrics['actor/pg_loss'], global_steps)
         # perform validation after training
         if self.val_reward_fn is not None:
             val_metrics = self._validate()

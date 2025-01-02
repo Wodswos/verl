@@ -34,7 +34,7 @@ actor_rollout_ref:
       total_training_steps: -1  # must be override by program
     megatron:
       tensor_model_parallel_size: 2
-      pipeline_model_parallel_size: 2
+      pipeline_model_parallel_size: 1
       num_layers_per_virtual_pipeline_stage: null # vpp will hang. need debug.
       sequence_parallel: True
       seed: 1
@@ -42,7 +42,7 @@ actor_rollout_ref:
   ref:
     megatron:
       tensor_model_parallel_size: 2
-      pipeline_model_parallel_size: 2
+      pipeline_model_parallel_size: 1
       num_layers_per_virtual_pipeline_stage: null # vpp will hang. need debug.
       sequence_parallel: True
       seed: 1
@@ -68,7 +68,7 @@ actor_rollout_ref:
     max_num_seqs: 1024
     log_prob_micro_batch_size: 2
     # for hf rollout
-    do_sample: True
+    do_sample: False
     layer_name_map:
       qkv_layer_name: qkv
       gate_proj_layer_name: gate_up
@@ -90,7 +90,7 @@ critic:
     enable_gradient_checkpointing: False
   megatron:
     tensor_model_parallel_size: 2
-    pipeline_model_parallel_size: 2
+    pipeline_model_parallel_size: 1
     num_layers_per_virtual_pipeline_stage: null # vpp will hang. need debug.
     sequence_parallel: True
     seed: 1
@@ -109,7 +109,7 @@ reward_model:
   strategy: megatron
   megatron:
     tensor_model_parallel_size: 2
-    pipeline_model_parallel_size: 2
+    pipeline_model_parallel_size: 1
     num_layers_per_virtual_pipeline_stage: null # vpp will hang. need debug.
     sequence_parallel: True
     seed: 1
